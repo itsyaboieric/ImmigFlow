@@ -44,7 +44,7 @@ Single SQLite file (`dev.db`) managed by Prisma. Three models: `User → Case �
 `validateCrossDocuments(docs, caseInfo)` runs pure checks on extracted data:
 - Name consistency: extracts the "name" field per document type (keyed differently per type — `full_name` for passport, `applicant_name` for job offer, `employee_name` for others, `graduate_name` for diploma) and checks pairwise overlap.
 - Passport expiry: compares `expiry_date` against today and against `permitEnd + 6 months` if `caseInfo.permitDuration` is set.
-- Wage floor: hardcoded annual minimums per province (ON, BC, AB, QC, SK, MB, NS, NB) compared to `annual_salary`.
+- Wage floor: hardcoded annual minimums per province (ON, BC, AB, QC, SK, MB, NS, NB) compared to `annual_salary` from the extracted offer doc, falling back to `caseInfo.offeredSalary` (manually entered on the case) if no offer doc has been extracted yet.
 
 `generateFormFieldMapping(docs)` maps extracted fields to human-readable IRCC form field labels for the review UI. JOB_OFFER takes precedence over EMPLOYMENT_LETTER for employer/job fields.
 
@@ -60,4 +60,4 @@ Uploaded files are written to `uploads/<caseId>/<timestamp>_<random>.<ext>` on t
 
 ### Case detail page (`app/(dashboard)/cases/[id]/page.tsx`)
 
-The largest file (~500 lines). Fully client-side. Manages all tab state, upload state, per-document extraction loading state (`Record<string, boolean>`), and validation/form-mapping results locally. The sign-off flow requires `confirmed` checkbox, calls `POST /api/cases/[id]/signoff`, then offers a client-side JSON download built from current state — no server-side export route exists.
+The largest file (~810 lines). Fully client-side. Manages all tab state, upload state, per-document extraction loading state (`Record<string, boolean>`), and validation/form-mapping results locally. The sign-off flow requires `confirmed` checkbox, calls `POST /api/cases/[id]/signoff`, then offers a client-side JSON download built from current state — no server-side export route exists.

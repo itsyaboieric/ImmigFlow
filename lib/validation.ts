@@ -140,8 +140,9 @@ export function validateCrossDocuments(
   }
 
   // Wage check (simplified ESDC floor rates)
+  // Uses extracted annual_salary from offer doc; falls back to caseInfo.offeredSalary entered manually
   const offerDoc = docs.find(d => d.type === 'JOB_OFFER' || d.type === 'EMPLOYMENT_LETTER')
-  if (offerDoc && caseInfo.province) {
+  if (caseInfo.province) {
     const minAnnual: Record<string, number> = {
       ON: 17.2 * 40 * 52,
       BC: 17.4 * 40 * 52,
@@ -153,17 +154,19 @@ export function validateCrossDocuments(
       NB: 14.75 * 40 * 52,
     }
     const floor = minAnnual[caseInfo.province] ?? 14.0 * 40 * 52
-    const salary = (offerDoc.data.annual_salary as number) || 0
+    const salary = (offerDoc?.data.annual_salary as number) || caseInfo.offeredSalary || 0
+    const salarySource = offerDoc ? offerDoc.fileName : 'case details'
+    const docIds = offerDoc ? [offerDoc.docId] : []
 
     if (salary > 0 && salary < floor) {
       errors.push({
         id: 'wage_below_floor',
         severity: 'error',
         field: 'Offered Wage',
-        message: `Offered salary ($${salary.toLocaleString()}/yr) may be below minimum wage for ${
+        message: `Offered salary ($${salary.toLocaleString()}/yr from ${salarySource}) may be below minimum wage for ${
           caseInfo.province
         } (~$${Math.round(floor).toLocaleString()}/yr). ESDC requires the offered wage to meet or exceed the prevailing wage for the NOC code.`,
-        documents: [offerDoc.docId],
+        documents: docIds,
         resolution:
           'Verify the offered wage against the ESDC Job Bank Wage Data for this NOC code and province.',
       })

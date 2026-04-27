@@ -17,7 +17,6 @@ export const DOCUMENT_TYPE_LABELS: Record<string, string> = {
 export const CASE_STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Draft',
   DOCUMENTS_PENDING: 'Documents Pending',
-  PROCESSING: 'Processing',
   REVIEW: 'Ready for Review',
   SIGNED_OFF: 'Signed Off',
 }
@@ -25,7 +24,6 @@ export const CASE_STATUS_LABELS: Record<string, string> = {
 export const CASE_STATUS_COLORS: Record<string, string> = {
   DRAFT: 'bg-gray-100 text-gray-700',
   DOCUMENTS_PENDING: 'bg-yellow-100 text-yellow-800',
-  PROCESSING: 'bg-blue-100 text-blue-800',
   REVIEW: 'bg-indigo-100 text-indigo-800',
   SIGNED_OFF: 'bg-green-100 text-green-800',
 }
