@@ -11,27 +11,21 @@ npm run build        # Production build
 npm start            # Run production build
 
 # Database
-npm run db:generate      # Regenerate Prisma client after schema changes
-npm run db:push          # Sync schema to dev.db without migrations (solo dev convenience)
-npm run db:migrate       # Create / apply migrations in dev (`prisma migrate dev`)
-npm run db:migrate:deploy # Apply pending migrations (`prisma migrate deploy`, CI/prod)
-
-# Quality
-npm run lint   # ESLint (`next lint`)
-npm run test   # Vitest unit tests (`tests/*.test.ts`)
+npm run db:generate  # Regenerate Prisma client after schema changes
+npm run db:push      # Sync schema to dev.db without migrations (dev only)
 ```
 
-If `dev.db` already exists from historic `db:push` use only, baseline migrations once: `npx prisma migrate resolve --applied 20260509120000_baseline`
-
-After any change to `prisma/schema.prisma`, run `db:generate`, then prefer `db:migrate` over `db:push`.
-
 > Node.js is not system-installed. During this session it was bootstrapped from `/tmp/node-v20.18.1-darwin-x64/bin/`. Prefix commands with `export PATH="/tmp/node-v20.18.1-darwin-x64/bin:$PATH"` if `node`/`npm`/`npx` are not found. Running `setup.sh` installs Node.js permanently via Homebrew.
+
+There are no tests and no lint script configured.
+
+After any change to `prisma/schema.prisma`, run `db:generate` then `db:push`.
 
 ## Architecture
 
 ### Request flow
 
-`(dashboard)/layout.tsx` checks the session server-side. Most dashboard pages fetch via `fetch('/api/...')` in Client Components. The **case detail** route (`cases/[id]`) additionally loads initial case HTML on the server through `lib/server/load-case-detail.ts`; the interactive shell is still `components/cases/CaseDetailClient.tsx`.
+Every authenticated page fetches data client-side via `fetch('/api/...')`. There is no server-side data fetching in page components — the `(dashboard)/layout.tsx` only checks the session server-side to gate the route group; actual data loading happens in Client Components with `useEffect`.
 
 ### Auth
 
@@ -43,14 +37,14 @@ Single SQLite file (`dev.db`) managed by Prisma. Three models: `User → Case �
 
 ### AI extraction pipeline (`lib/claude.ts`)
 
-`extractDocumentData(buffer, mimeType, documentType)` sends a file to `claude-sonnet-4-6` as either a `document` block (PDF) or `image` block (JPEG/PNG/WebP) alongside a strict JSON schema prompt. The textual response is parsed with `lib/parse-json-block.ts` (fences-aware, tries successive balanced `{...}` candidates). If parsing fails, `confidence: 0.0` is returned with `parse_error: true` in the data. Each document type has its own prompt in `EXTRACTION_PROMPTS` — edit these to change what fields are extracted.
+`extractDocumentData(buffer, mimeType, documentType)` sends a file to `claude-sonnet-4-6` as either a `document` block (PDF) or `image` block (JPEG/PNG/WebP) alongside a strict JSON schema prompt. The response is regex-matched for a JSON object and parsed. If parsing fails, `confidence: 0.0` is returned with `parse_error: true` in the data. Each document type has its own prompt in `EXTRACTION_PROMPTS` — edit these to change what fields are extracted.
 
 ### Validation and form mapping (`lib/validation.ts`)
 
 `validateCrossDocuments(docs, caseInfo)` runs pure checks on extracted data:
 - Name consistency: extracts the "name" field per document type (keyed differently per type — `full_name` for passport, `applicant_name` for job offer, `employee_name` for others, `graduate_name` for diploma) and checks pairwise overlap.
 - Passport expiry: compares `expiry_date` against today and against `permitEnd + 6 months` if `caseInfo.permitDuration` is set.
-- Wage floor: hardcoded annual minimums per province (ON, BC, AB, QC, SK, MB, NS, NB) compared to `annual_salary` from the extracted offer doc, falling back to `caseInfo.offeredSalary` (manually entered on the case) if no offer doc has been extracted yet.
+- Wage floor: hardcoded annual minimums per province (ON, BC, AB, QC, SK, MB, NS, NB) compared to `annual_salary`.
 
 `generateFormFieldMapping(docs)` maps extracted fields to human-readable IRCC form field labels for the review UI. JOB_OFFER takes precedence over EMPLOYMENT_LETTER for employer/job fields.
 
@@ -62,12 +56,597 @@ Both functions are called server-side in `app/api/cases/[id]/validate/route.ts` 
 
 ### File storage
 
-`lib/storage.ts` owns read/write/delete paths under `uploads/<caseId>/` (still local disk for MVP). Hard cap `MAX_UPLOAD_BYTES` (4 MB) is enforced server-side at upload time. Case deletion removes orphaned files (`removeCaseUploadDirectory`). Swap `storage` internals for cloud object storage in production.
+Uploaded files are written to `uploads/<caseId>/<timestamp>_<random>.<ext>` on the local filesystem (not in `public/`). The extract route reads them back with `readFileSync`. There is no file-serving API route — files are never streamed to the browser. For production, replace with cloud object storage and update both `app/api/upload/route.ts` and `app/api/documents/[id]/extract/route.ts`.
 
-There is no file-serving API route — files are never streamed to the browser.
+### Case detail page (`app/(dashboard)/cases/[id]/page.tsx`)
 
-### Case detail UI
+The largest file (~500 lines). Fully client-side. Manages all tab state, upload state, per-document extraction loading state (`Record<string, boolean>`), and validation/form-mapping results locally. The sign-off flow requires `confirmed` checkbox, calls `POST /api/cases/[id]/signoff`, then offers a client-side JSON download built from current state — no server-side export route exists.
 
-`app/(dashboard)/cases/[id]/page.tsx` (server shell) wraps `components/cases/CaseDetailClient.tsx`. Tab bodies live under `components/cases/*Tab.tsx`; client refresh still uses `/api/cases/[id]` after uploads and extraction.
+# CLAUDE.md
 
-The sign-off flow requires `confirmed` checkbox, calls `POST /api/cases/[id]/signoff`, then offers a client-side JSON download built from current state — no server-side export route exists.
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
+
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+
+## 1. Think Before Coding
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+## 2. Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+## 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+## 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+---
+
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+# Examples
+
+Real-world code examples demonstrating the four principles. Each example shows what LLMs commonly do wrong and how to fix it.
+
+---
+
+## 1. Think Before Coding
+
+### Example 1: Hidden Assumptions
+
+**User Request:** "Add a feature to export user data"
+
+**❌ What LLMs Do (Wrong Assumptions)**
+
+```python
+def export_users(format='json'):
+    """Export all users to a file."""
+    users = User.query.all()
+    
+    if format == 'json':
+        with open('users.json', 'w') as f:
+            json.dump([u.to_dict() for u in users], f)
+    elif format == 'csv':
+        with open('users.csv', 'w') as f:
+            writer = csv.DictWriter(f, fieldnames=['id', 'email', 'name'])
+            writer.writeheader()
+            writer.writerows([u.to_dict() for u in users])
+    
+    return f"Exported {len(users)} users"
+```
+
+**Problems:**
+- Assumed it should export ALL users (what about pagination? privacy?)
+- Assumed file location without asking
+- Assumed which fields to include
+- Assumed CSV fieldnames without checking actual data structure
+
+**✅ What Should Happen (Surface Assumptions)**
+
+```
+Before implementing, I need to clarify:
+
+1. **Scope**: Export all users or filtered subset? (privacy implications)
+2. **Format**: You mentioned "export" - did you mean:
+   - Download file in browser?
+   - Background job with email notification?
+   - API endpoint returning data?
+3. **Fields**: Which user fields? (some might be sensitive)
+4. **Volume**: How many users typically? (affects approach)
+
+Simplest approach: Add an API endpoint that returns paginated JSON.
+Would need more info for file-based exports.
+
+What's your preference?
+```
+
+### Example 2: Multiple Interpretations
+
+**User Request:** "Make the search faster"
+
+**❌ What LLMs Do (Pick Silently)**
+
+```python
+# Adds caching, database indexes, and async processing
+# without asking which "faster" matters
+@lru_cache(maxsize=1000)
+async def search(query: str) -> List[Result]:
+    # ... 200 lines of optimization code
+```
+
+**✅ What Should Happen**
+
+```
+"Make the search faster" could mean:
+
+1. **Faster response time** (< 100ms instead of 500ms)
+   - Add database indexes
+   - Cache frequent queries
+   - Estimated effort: 2 hours
+
+2. **Handle more concurrent searches** (throughput)
+   - Add async/await
+   - Connection pooling
+   - Estimated effort: 4 hours
+
+3. **Faster perceived speed** (UX)
+   - Show partial results immediately
+   - Progressive loading
+   - Estimated effort: 3 hours
+
+Current search takes ~500ms for typical queries. 
+Which aspect matters most for your use case?
+```
+
+---
+
+## 2. Simplicity First
+
+### Example 1: Over-abstraction
+
+**User Request:** "Add a function to calculate discount"
+
+**❌ What LLMs Do (Overengineered)**
+
+```python
+from abc import ABC, abstractmethod
+from enum import Enum
+from typing import Protocol, Union
+from dataclasses import dataclass
+
+class DiscountStrategy(ABC):
+    @abstractmethod
+    def calculate(self, amount: float) -> float:
+        pass
+
+class PercentageDiscount(DiscountStrategy):
+    def __init__(self, percentage: float):
+        self.percentage = percentage
+    
+    def calculate(self, amount: float) -> float:
+        return amount * (self.percentage / 100)
+
+class FixedDiscount(DiscountStrategy):
+    def __init__(self, fixed_amount: float):
+        self.fixed_amount = fixed_amount
+    
+    def calculate(self, amount: float) -> float:
+        return min(self.fixed_amount, amount)
+
+@dataclass
+class DiscountConfig:
+    strategy: DiscountStrategy
+    min_purchase: float = 0.0
+    max_discount: float = float('inf')
+
+class DiscountCalculator:
+    def __init__(self, config: DiscountConfig):
+        self.config = config
+    
+    def apply_discount(self, amount: float) -> float:
+        if amount < self.config.min_purchase:
+            return 0
+        discount = self.config.strategy.calculate(amount)
+        return min(discount, self.config.max_discount)
+
+# Usage requires 30+ lines of setup for a simple calculation
+```
+
+**✅ What Should Happen (Simple)**
+
+```python
+def calculate_discount(amount: float, percent: float) -> float:
+    """Calculate discount amount. percent should be 0-100."""
+    return amount * (percent / 100)
+
+# Usage
+discount = calculate_discount(100.0, 10.0)  # $10 off
+```
+
+**When to add complexity:** Only when you actually need multiple discount types. If that requirement comes later, refactor then.
+
+### Example 2: Speculative Features
+
+**User Request:** "Save user preferences to database"
+
+**❌ What LLMs Do (Unnecessary Features)**
+
+```python
+class PreferenceManager:
+    def __init__(self, db, cache=None, validator=None):
+        self.db = db
+        self.cache = cache or InMemoryCache()
+        self.validator = validator or DefaultValidator()
+    
+    def save(self, user_id: int, prefs: dict, 
+             merge: bool = True, 
+             validate: bool = True,
+             notify: bool = False) -> bool:
+        """Save preferences with optional merging, validation, and notifications."""
+        
+        if validate:
+            errors = self.validator.validate(prefs)
+            if errors:
+                raise ValidationError(errors)
+        
+        existing = self.get(user_id) if merge else {}
+        
+        if merge:
+            existing.update(prefs)
+            prefs = existing
+        
+        self.db.execute(
+            "UPDATE users SET preferences = ? WHERE id = ?",
+            (json.dumps(prefs), user_id)
+        )
+        
+        if self.cache:
+            self.cache.set(f"prefs:{user_id}", prefs)
+        
+        if notify:
+            self.notify_preference_change(user_id, prefs)
+        
+        return True
+    
+    def notify_preference_change(self, user_id: int, prefs: dict):
+        # Another 30 lines for a feature nobody asked for
+        pass
+```
+
+**✅ What Should Happen (Just What Was Asked)**
+
+```python
+def save_preferences(db, user_id: int, preferences: dict):
+    """Save user preferences to database."""
+    db.execute(
+        "UPDATE users SET preferences = ? WHERE id = ?",
+        (json.dumps(preferences), user_id)
+    )
+```
+
+**Add later if needed:** Caching (when performance matters), validation (when bad data appears), merging (when requirement emerges).
+
+---
+
+## 3. Surgical Changes
+
+### Example 1: Drive-by Refactoring
+
+**User Request:** "Fix the bug where empty emails crash the validator"
+
+**❌ What LLMs Do (Too Much)**
+
+```diff
+  def validate_user(user_data):
+-     # Check email format
+-     if not user_data.get('email'):
++     """Validate user data."""
++     email = user_data.get('email', '').strip()
++     
++     # Validate email
++     if not email:
+          raise ValueError("Email required")
+-     
+-     # Basic email validation
+-     if '@' not in user_data['email']:
++     if '@' not in email or '.' not in email.split('@')[1]:
+          raise ValueError("Invalid email")
+      
+-     # Check username
+-     if not user_data.get('username'):
++     # Validate username
++     username = user_data.get('username', '').strip()
++     if not username:
+          raise ValueError("Username required")
++     if len(username) < 3:
++         raise ValueError("Username too short")
++     if not username.isalnum():
++         raise ValueError("Username must be alphanumeric")
+      
+      return True
+```
+
+**Problems:**
+- "Improved" email validation beyond the bug fix
+- Added username validation nobody asked for
+- Changed comments
+- Added docstring
+
+**✅ What Should Happen (Surgical)**
+
+```diff
+  def validate_user(user_data):
+      # Check email format
+-     if not user_data.get('email'):
++     email = user_data.get('email', '')
++     if not email or not email.strip():
+          raise ValueError("Email required")
+      
+      # Basic email validation
+-     if '@' not in user_data['email']:
++     if '@' not in email:
+          raise ValueError("Invalid email")
+      
+      # Check username
+      if not user_data.get('username'):
+          raise ValueError("Username required")
+      
+      return True
+```
+
+**Only changed:** The specific lines that fix empty email handling.
+
+### Example 2: Style Drift
+
+**User Request:** "Add logging to the upload function"
+
+**❌ What LLMs Do (Reformat Everything)**
+
+```diff
+- def upload_file(file_path, destination):
++ def upload_file(file_path: str, destination: str) -> bool:
++     """Upload file to destination with logging."""
++     logger.info(f"Uploading {file_path} to {destination}")
++     
+      try:
+-         with open(file_path, 'rb') as f:
+-             data = f.read()
+-         
+-         response = requests.post(destination, files={'file': data})
+-         
+-         if response.status_code == 200:
+-             return True
+-         else:
+-             return False
++         with open(file_path, "rb") as f:
++             data = f.read()
++         response = requests.post(destination, files={"file": data})
++         success = response.status_code == 200
++         
++         if success:
++             logger.info(f"Upload successful: {file_path}")
++         else:
++             logger.error(f"Upload failed: {file_path}, status={response.status_code}")
++         
++         return success
+      except Exception as e:
+-         print(f"Error: {e}")
++         logger.exception(f"Upload error for {file_path}: {e}")
+          return False
+```
+
+**Problems:**
+- Changed quote style ('' to "")
+- Added type hints nobody asked for
+- Added docstring
+- Reformatted whitespace
+- Changed boolean return logic
+
+**✅ What Should Happen (Match Existing Style)**
+
+```diff
++ import logging
++ 
++ logger = logging.getLogger(__name__)
++ 
+  def upload_file(file_path, destination):
++     logger.info(f'Starting upload: {file_path}')
+      try:
+          with open(file_path, 'rb') as f:
+              data = f.read()
+          
+          response = requests.post(destination, files={'file': data})
+          
+          if response.status_code == 200:
++             logger.info(f'Upload successful: {file_path}')
+              return True
+          else:
++             logger.error(f'Upload failed: {file_path}, status={response.status_code}')
+              return False
+      except Exception as e:
+-         print(f"Error: {e}")
++         logger.exception(f'Upload error: {file_path}')
+          return False
+```
+
+**Matched:** Single quotes, no type hints, existing boolean pattern, spacing style.
+
+---
+
+## 4. Goal-Driven Execution
+
+### Example 1: Vague vs. Verifiable
+
+**User Request:** "Fix the authentication system"
+
+**❌ What LLMs Do (Vague Approach)**
+
+```
+I'll fix the authentication system by:
+1. Reviewing the code
+2. Identifying issues
+3. Making improvements
+4. Testing the changes
+
+[Proceeds to make changes without clear success criteria]
+```
+
+**✅ What Should Happen (Verifiable Goals)**
+
+```
+To "fix authentication," I need to define success criteria. 
+What specific issue are we solving?
+
+If the issue is "users stay logged in after password change":
+
+Plan:
+1. Write test: Change password → verify old session invalidated
+   Verify: Test fails (reproduces bug)
+
+2. Implement: Invalidate sessions on password change
+   Verify: Test passes
+
+3. Check edge cases: Multiple active sessions, concurrent changes
+   Verify: Additional tests pass
+
+4. Verify no regression: Existing auth tests still pass
+   Verify: Full test suite green
+
+Current test coverage for auth: [shows coverage]
+What's the specific auth issue you're seeing?
+```
+
+### Example 2: Multi-Step with Verification
+
+**User Request:** "Add rate limiting to the API"
+
+**❌ What LLMs Do (All at Once)**
+
+```python
+# Implements full rate limiting with Redis, multiple strategies,
+# configuration system, and monitoring in one 300-line commit
+# No clear verification steps
+```
+
+**✅ What Should Happen (Incremental with Verification)**
+
+```
+Plan for rate limiting:
+
+1. Add basic in-memory rate limiting (single endpoint)
+   Verify: 
+   - Test: 100 requests → first 10 succeed, rest get 429
+   - Manual: curl endpoint 11 times, see rate limit error
+
+2. Extract to middleware (apply to all endpoints)
+   Verify:
+   - Test: Rate limits apply to /users and /posts
+   - Existing endpoint tests still pass
+
+3. Add Redis backend (for multi-server)
+   Verify:
+   - Test: Rate limit persists across app restarts
+   - Test: Two app instances share rate limit counter
+
+4. Add configuration (rates per endpoint)
+   Verify:
+   - Test: /search allows 10/min, /users allows 100/min
+   - Config file parsed correctly
+
+Each step is independently verifiable and deployable.
+Start with step 1?
+```
+
+### Example 3: Test-First Verification
+
+**User Request:** "The sorting breaks when there are duplicate scores"
+
+**❌ What LLMs Do (Fix Without Reproducing)**
+
+```python
+# Immediately changes sort logic without confirming the bug
+def sort_scores(scores):
+    return sorted(scores, key=lambda x: (-x['score'], x['name']))
+```
+
+**✅ What Should Happen (Reproduce First)**
+
+```python
+# 1. First, write a test that reproduces the issue
+def test_sort_with_duplicate_scores():
+    """Test sorting when multiple items have same score."""
+    scores = [
+        {'name': 'Alice', 'score': 100},
+        {'name': 'Bob', 'score': 100},
+        {'name': 'Charlie', 'score': 90},
+    ]
+    
+    result = sort_scores(scores)
+    
+    # The bug: order is non-deterministic for duplicates
+    # Run this test multiple times, it should be consistent
+    assert result[0]['score'] == 100
+    assert result[1]['score'] == 100
+    assert result[2]['score'] == 90
+
+# Verify: Run test 10 times → fails with inconsistent ordering
+
+# 2. Now fix with stable sort
+def sort_scores(scores):
+    """Sort by score descending, then name ascending for ties."""
+    return sorted(scores, key=lambda x: (-x['score'], x['name']))
+
+# Verify: Test passes consistently
+```
+
+---
+
+## Anti-Patterns Summary
+
+| Principle | Anti-Pattern | Fix |
+|-----------|-------------|-----|
+| Think Before Coding | Silently assumes file format, fields, scope | List assumptions explicitly, ask for clarification |
+| Simplicity First | Strategy pattern for single discount calculation | One function until complexity is actually needed |
+| Surgical Changes | Reformats quotes, adds type hints while fixing bug | Only change lines that fix the reported issue |
+| Goal-Driven | "I'll review and improve the code" | "Write test for bug X → make it pass → verify no regressions" |
+
+## Key Insight
+
+The "overcomplicated" examples aren't obviously wrong—they follow design patterns and best practices. The problem is **timing**: they add complexity before it's needed, which:
+
+- Makes code harder to understand
+- Introduces more bugs
+- Takes longer to implement
+- Harder to test
+
+The "simple" versions are:
+- Easier to understand
+- Faster to implement
+- Easier to test
+- Can be refactored later when complexity is actually needed
+
+**Good code is code that solves today's problem simply, not tomorrow's problem prematurely.**

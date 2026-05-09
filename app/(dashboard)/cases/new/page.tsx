@@ -8,20 +8,23 @@ import { PROVINCES } from '@/lib/utils'
 const APPLICATION_TYPES = [
   {
     value: 'LMIA_HIGH_WAGE',
-    label: 'LMIA — High Wage Position',
-    desc: 'For positions at or above the provincial median hourly wage. Typically NOC TEER 0–3.',
+    label: 'LMIA — High Wage',
+    desc: 'Position at or above the provincial median. Typically NOC TEER 0–3.',
   },
   {
     value: 'LMIA_LOW_WAGE',
-    label: 'LMIA — Low Wage Position',
-    desc: 'For positions below the provincial median hourly wage. Typically NOC TEER 4–5.',
+    label: 'LMIA — Low Wage',
+    desc: 'Position below the provincial median. Typically NOC TEER 4–5.',
   },
   {
     value: 'WORK_PERMIT',
     label: 'Employer-Specific Work Permit',
-    desc: 'Work permit tied to a specific employer, using a valid LMIA or exemption.',
+    desc: 'Tied to a specific employer via LMIA or exemption code.',
   },
 ]
+
+const inputClass = "w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all placeholder:text-gray-400"
+const labelClass = "block text-[13px] font-medium text-gray-700 mb-1.5"
 
 export default function NewCasePage() {
   const router = useRouter()
@@ -47,10 +50,7 @@ export default function NewCasePage() {
 
   async function handleSubmit() {
     setError('')
-    if (!form.title) {
-      setError('Please provide a case title.')
-      return
-    }
+    if (!form.title.trim()) { setError('Please provide a case title.'); return }
     setLoading(true)
     const res = await fetch('/api/cases', {
       method: 'POST',
@@ -59,219 +59,187 @@ export default function NewCasePage() {
     })
     const data = await res.json()
     setLoading(false)
-    if (!res.ok) {
-      setError(data.error ?? 'Failed to create case.')
-    } else {
-      router.push(`/cases/${data.id}`)
-    }
+    if (!res.ok) { setError(data.error ?? 'Failed to create case.'); return }
+    router.push(`/cases/${data.id}`)
   }
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="flex items-center gap-3 mb-8">
-        <Link href="/dashboard" className="text-gray-400 hover:text-gray-600 transition-colors">
-          ← Cases
-        </Link>
-        <span className="text-gray-300">/</span>
-        <span className="text-gray-600 font-medium">New Case</span>
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm text-gray-400 mb-8">
+        <Link href="/dashboard" className="hover:text-gray-700 transition-colors">Cases</Link>
+        <span>/</span>
+        <span className="text-gray-700 font-medium">New Case</span>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-8">
-        {/* Step indicators */}
-        <div className="flex items-center gap-2 mb-8">
-          {[1, 2].map(s => (
-            <div key={s} className="flex items-center gap-2">
-              <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold ${
-                  step >= s ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-400'
-                }`}
-              >
-                {s}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-card overflow-hidden">
+        {/* Progress header */}
+        <div className="px-8 pt-7 pb-6 border-b border-gray-100">
+          <h1 className="text-lg font-bold text-gray-900 tracking-tight mb-4">
+            {step === 1 ? 'Select application type' : 'Case details'}
+          </h1>
+          <div className="flex items-center gap-2">
+            {[1, 2].map(s => (
+              <div key={s} className="flex items-center gap-2">
+                <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold transition-all ${
+                  step > s
+                    ? 'bg-emerald-500 text-white'
+                    : step === s
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-400'
+                }`}>
+                  {step > s
+                    ? <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    : s
+                  }
+                </div>
+                <span className={`text-sm ${step >= s ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>
+                  {s === 1 ? 'Application Type' : 'Details'}
+                </span>
+                {s < 2 && <div className="w-8 h-px bg-gray-200 mx-1" />}
               </div>
-              <span className={`text-sm ${step >= s ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>
-                {s === 1 ? 'Application Type' : 'Case Details'}
-              </span>
-              {s < 2 && <div className="w-8 h-px bg-gray-200 mx-1" />}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
-        {step === 1 && (
-          <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Select Application Type</h2>
-            <p className="text-gray-500 text-sm mb-6">
-              This determines the document checklist and validation rules for this case.
-            </p>
-
-            <div className="space-y-3">
-              {APPLICATION_TYPES.map(type => (
-                <button
-                  key={type.value}
-                  onClick={() => set('applicationType', type.value)}
-                  className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
-                    form.applicationType === type.value
-                      ? 'border-brand-500 bg-brand-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="font-medium text-gray-900 text-sm">{type.label}</div>
-                  <div className="text-gray-500 text-xs mt-1">{type.desc}</div>
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => form.applicationType && setStep(2)}
-              disabled={!form.applicationType}
-              className="mt-6 w-full bg-brand-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              Continue
-            </button>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Case Details</h2>
-            <p className="text-gray-500 text-sm mb-6">
-              These details shape the document checklist and enable precise validation checks.
-            </p>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Case Title <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={form.title}
-                  onChange={e => set('title', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  placeholder="e.g., Smith / ABC Corp — LMIA 2026"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Client Name</label>
-                  <input
-                    type="text"
-                    value={form.clientName}
-                    onChange={e => set('clientName', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    placeholder="John Smith"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Client Nationality</label>
-                  <input
-                    type="text"
-                    value={form.nationality}
-                    onChange={e => set('nationality', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    placeholder="India, Philippines, etc."
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Employer Name</label>
-                  <input
-                    type="text"
-                    value={form.employerName}
-                    onChange={e => set('employerName', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    placeholder="ABC Corporation Inc."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Province</label>
-                  <select
-                    value={form.province}
-                    onChange={e => set('province', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+        <div className="p-8">
+          {step === 1 ? (
+            <>
+              <div className="space-y-3 mb-8">
+                {APPLICATION_TYPES.map(type => (
+                  <button
+                    key={type.value}
+                    type="button"
+                    onClick={() => set('applicationType', type.value)}
+                    className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                      form.applicationType === type.value
+                        ? 'border-brand-500 bg-brand-50'
+                        : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-white'
+                    }`}
                   >
-                    <option value="">Select province</option>
-                    {PROVINCES.map(p => (
-                      <option key={p.value} value={p.value}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                    <div className="flex items-start gap-3">
+                      <div className={`w-4 h-4 rounded-full border-2 mt-0.5 flex-shrink-0 flex items-center justify-center ${
+                        form.applicationType === type.value
+                          ? 'border-brand-500 bg-brand-500'
+                          : 'border-gray-300'
+                      }`}>
+                        {form.applicationType === type.value && (
+                          <div className="w-1.5 h-1.5 bg-white rounded-full" />
+                        )}
+                      </div>
+                      <div>
+                        <div className={`font-semibold text-sm ${form.applicationType === type.value ? 'text-brand-900' : 'text-gray-800'}`}>
+                          {type.label}
+                        </div>
+                        <div className="text-gray-500 text-xs mt-0.5">{type.desc}</div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
               </div>
-
-              <div className="grid grid-cols-3 gap-4">
+              <button
+                type="button"
+                onClick={() => form.applicationType && setStep(2)}
+                disabled={!form.applicationType}
+                className="w-full bg-gray-900 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Continue →
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">NOC Code</label>
+                  <label className={labelClass}>
+                    Case Title <span className="text-red-400">*</span>
+                  </label>
                   <input
                     type="text"
-                    value={form.nocCode}
-                    onChange={e => set('nocCode', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    placeholder="e.g. 21232"
+                    value={form.title}
+                    onChange={e => set('title', e.target.value)}
+                    className={inputClass}
+                    placeholder="e.g. Smith / ABC Corp — LMIA 2026"
                   />
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Client Name</label>
+                    <input type="text" value={form.clientName} onChange={e => set('clientName', e.target.value)} className={inputClass} placeholder="John Smith" />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Client Nationality</label>
+                    <input type="text" value={form.nationality} onChange={e => set('nationality', e.target.value)} className={inputClass} placeholder="India, Philippines…" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Employer Name</label>
+                    <input type="text" value={form.employerName} onChange={e => set('employerName', e.target.value)} className={inputClass} placeholder="ABC Corporation Inc." />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Province</label>
+                    <select value={form.province} onChange={e => set('province', e.target.value)} className={inputClass + ' cursor-pointer'}>
+                      <option value="">Select province</option>
+                      {PROVINCES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className={labelClass}>NOC Code</label>
+                    <input type="text" value={form.nocCode} onChange={e => set('nocCode', e.target.value)} className={inputClass} placeholder="21232" />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Permit Duration (months)</label>
+                    <input type="number" min="1" max="60" value={form.permitDuration} onChange={e => set('permitDuration', e.target.value)} className={inputClass} placeholder="24" />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Offered Salary (CAD/yr)</label>
+                    <input type="number" value={form.offeredSalary} onChange={e => set('offeredSalary', e.target.value)} className={inputClass} placeholder="65000" />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Permit Duration (months)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="60"
-                    value={form.permitDuration}
-                    onChange={e => set('permitDuration', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    placeholder="24"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Offered Salary (CAD/yr)</label>
-                  <input
-                    type="number"
-                    value={form.offeredSalary}
-                    onChange={e => set('offeredSalary', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    placeholder="65000"
+                  <label className={labelClass}>Internal Notes <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <textarea
+                    value={form.notes}
+                    onChange={e => set('notes', e.target.value)}
+                    rows={3}
+                    className={inputClass + ' resize-none'}
+                    placeholder="Any relevant context for this case…"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (internal)</label>
-                <textarea
-                  value={form.notes}
-                  onChange={e => set('notes', e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
-                  placeholder="Any relevant context for this case..."
-                />
-              </div>
-            </div>
+              {error && (
+                <div className="mt-5 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3.5 py-2.5">
+                  {error}
+                </div>
+              )}
 
-            {error && (
-              <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                {error}
+              <div className="flex gap-3 mt-7">
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
+                >
+                  ← Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  className="flex-1 bg-gray-900 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                >
+                  {loading ? 'Creating…' : 'Create Case →'}
+                </button>
               </div>
-            )}
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setStep(1)}
-                className="flex-1 border border-gray-300 text-gray-700 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-              >
-                Back
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={loading}
-                className="flex-1 bg-brand-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50 transition-colors"
-              >
-                {loading ? 'Creating...' : 'Create Case'}
-              </button>
-            </div>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

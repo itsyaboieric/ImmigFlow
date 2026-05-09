@@ -3,7 +3,63 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    scroll-behavior: smooth;
+  }
+
+  *,
+  *::before,
+  *::after {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
   body {
     @apply text-gray-900 bg-gray-50;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  /* Tighter focus ring — replaces browser default */
+  :focus-visible {
+    outline: 2px solid #4f46e5;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Thin, tasteful scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-gray-200 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-gray-300; }
+
+  /* Honor prefers-reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* CSS text-wrap balance — better headline wrapping */
+  .text-balance { text-wrap: balance; }
+
+  /* Subtle gradient used on homepage hero */
+  .bg-hero-gradient {
+    background: linear-gradient(
+      160deg,
+      #f8fafc 0%,
+      #f0f4ff 40%,
+      #f8fafc 100%
+    );
+  }
+
+  /* Grid dot pattern for homepage */
+  .bg-grid-dots {
+    background-image: radial-gradient(circle, #d1d5db 1px, transparent 1px);
+    background-size: 24px 24px;
   }
 }

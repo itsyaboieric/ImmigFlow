@@ -10,30 +10,44 @@ interface Props {
 
 export default function CaseDetailHeader({ caseData, deleting, onDeleteCase }: Props) {
   return (
-    <div className="flex items-start justify-between mb-6">
-      <div>
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-          <Link href="/dashboard" className="hover:text-gray-900 transition-colors">Cases</Link>
-          <span>/</span>
-          <span className="text-gray-900 font-medium truncate max-w-xs">{caseData.title}</span>
+    <div className="flex items-start justify-between mb-7">
+      <div className="min-w-0">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-1.5 text-[13px] text-gray-400 mb-2.5">
+          <Link href="/dashboard" className="hover:text-gray-700 transition-colors font-medium">Cases</Link>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-gray-300">
+            <path d="M4.5 3L7.5 6l-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span className="text-gray-700 font-medium truncate max-w-[280px]">{caseData.title}</span>
         </div>
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-gray-900">{caseData.title}</h1>
-          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${CASE_STATUS_COLORS[caseData.status] ?? 'bg-gray-100 text-gray-600'}`}>
+
+        {/* Title + badge */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <h1 className="text-[22px] font-bold text-gray-900 tracking-tight leading-tight">
+            {caseData.title}
+          </h1>
+          <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${
+            CASE_STATUS_COLORS[caseData.status] ?? 'bg-gray-100 text-gray-600'
+          }`}>
             {CASE_STATUS_LABELS[caseData.status] ?? caseData.status}
           </span>
         </div>
-        <div className="text-sm text-gray-500 mt-1">
-          {APPLICATION_TYPE_LABELS[caseData.applicationType]} · Created {formatDate(caseData.createdAt)}
+
+        {/* Meta line */}
+        <div className="flex items-center gap-2 mt-1.5 text-[13px] text-gray-400">
+          <span>{APPLICATION_TYPE_LABELS[caseData.applicationType]}</span>
+          <span className="text-gray-200">·</span>
+          <span>Created {formatDate(caseData.createdAt)}</span>
         </div>
       </div>
+
       <button
         type="button"
         onClick={onDeleteCase}
         disabled={deleting}
-        className="text-sm text-red-500 hover:text-red-700 transition-colors"
+        className="text-[13px] text-gray-400 hover:text-red-500 transition-colors disabled:opacity-50 flex-shrink-0 ml-4"
       >
-        Delete case
+        Delete
       </button>
     </div>
   )
