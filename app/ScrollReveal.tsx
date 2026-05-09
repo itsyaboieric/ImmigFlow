@@ -9,12 +9,17 @@ interface Props {
 }
 
 /**
- * Reveals children with a fade-up animation when they enter the viewport.
+ * Fade-up scroll reveal — progressive enhancement.
  *
- * Progressive enhancement — the server renders content fully visible.
- * JavaScript sets opacity:0 immediately on mount, then IntersectionObserver
- * restores visibility when the element enters the viewport.
- * If JS is slow or fails, users always see the content.
+ * Server renders content fully visible so there is no blank page on slow JS.
+ * After hydration:
+ *   1. If the element is already on screen at page load → leave it visible (no animation).
+ *   2. If the element is below the fold → hide it, then reveal with a fade-up
+ *      transition when the user scrolls to it.
+ *
+ * Double-rAF before observing ensures the browser has actually painted the
+ * hidden state before IntersectionObserver starts watching — without this,
+ * the observer fires synchronously and the transition never runs.
  */
 export default function ScrollReveal({ children, className = '', delay = 0 }: Props) {
   const ref = useRef<HTMLDivElement>(null)
@@ -23,10 +28,18 @@ export default function ScrollReveal({ children, className = '', delay = 0 }: Pr
     const el = ref.current
     if (!el) return
 
-    // Hide immediately now that JS is running
+    // Skip animation for elements already visible at page load
+    const { top, bottom } = el.getBoundingClientRect()
+    const alreadyVisible = top < window.innerHeight && bottom > 0
+    if (alreadyVisible) return
+
+    // Hide the element now that JS is running
     el.style.opacity = '0'
-    el.style.transform = 'translateY(26px)'
-    el.style.transition = `opacity 0.7s cubic-bezier(.22,1,.36,1) ${delay}ms, transform 0.7s cubic-bezier(.22,1,.36,1) ${delay}ms`
+    el.style.transform = 'translateY(28px)'
+    el.style.transition = [
+      `opacity  0.75s cubic-bezier(.22,1,.36,1) ${delay}ms`,
+      `transform 0.75s cubic-bezier(.22,1,.36,1) ${delay}ms`,
+    ].join(', ')
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -36,13 +49,23 @@ export default function ScrollReveal({ children, className = '', delay = 0 }: Pr
           observer.disconnect()
         }
       },
-      { threshold: 0.08 }
+      { threshold: 0.1 }
     )
 
-    // Small delay so the initial hidden state renders before we start observing
-    const t = setTimeout(() => observer.observe(el), 60)
+    // Double rAF: wait for the browser to paint the hidden state before
+    // we start observing — otherwise the observer can fire in the same
+    // frame and skip the transition entirely.
+    let raf1: number
+    let raf2: number
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        observer.observe(el)
+      })
+    })
+
     return () => {
-      clearTimeout(t)
+      cancelAnimationFrame(raf1)
+      cancelAnimationFrame(raf2)
       observer.disconnect()
     }
   }, [delay])
