@@ -3,63 +3,132 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    scroll-behavior: smooth;
-  }
+  :root { scroll-behavior: smooth; }
 
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   body {
-    @apply text-gray-900 bg-gray-50;
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    @apply text-gray-900 bg-white;
+    font-feature-settings: 'cv02','cv03','cv04','cv11';
   }
 
-  /* Tighter focus ring — replaces browser default */
-  :focus-visible {
-    outline: 2px solid #4f46e5;
-    outline-offset: 2px;
-    border-radius: 4px;
-  }
+  :focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; border-radius: 4px; }
 
-  /* Thin, tasteful scrollbar */
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { @apply bg-gray-200 rounded-full; }
   ::-webkit-scrollbar-thumb:hover { @apply bg-gray-300; }
-
-  /* Honor prefers-reduced-motion */
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-      scroll-behavior: auto !important;
-    }
-  }
 }
 
+/* ─── Hero load-in animations (pure CSS, no JS needed) ─────────────────── */
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Staggered text reveal on page load */
+.hero-badge { opacity:0; animation: fadeUp 0.6s cubic-bezier(.22,1,.36,1) 0.05s forwards; }
+.hero-h1    { opacity:0; animation: fadeUp 0.8s cubic-bezier(.22,1,.36,1) 0.20s forwards; }
+.hero-sub   { opacity:0; animation: fadeUp 0.7s cubic-bezier(.22,1,.36,1) 0.45s forwards; }
+.hero-cta   { opacity:0; animation: fadeUp 0.7s cubic-bezier(.22,1,.36,1) 0.65s forwards; }
+
+/* Card entry animations — each card fades in then floats continuously */
+@keyframes cardEntry {
+  from { opacity: 0; transform: translateY(28px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+/* Three independent float rhythms so cards never move in sync */
+@keyframes floatA {
+  0%,100% { transform: translateY(0px)   rotate(-2deg); }
+  50%     { transform: translateY(-14px) rotate(-1.3deg); }
+}
+@keyframes floatB {
+  0%,100% { transform: translateY(0px)  rotate(3.5deg); }
+  50%     { transform: translateY(-10px) rotate(2.8deg); }
+}
+@keyframes floatC {
+  0%,100% { transform: translateY(0px)   rotate(-1deg); }
+  50%     { transform: translateY(-18px) rotate(-0.4deg); }
+}
+
+/* typewriter-style field value reveal — card 1 extracted fields appear one by one */
+.field-v { opacity:0; animation: fadeIn 0.3s ease forwards; }
+.field-v-1 { animation-delay:0.8s;  }
+.field-v-2 { animation-delay:1.05s; }
+.field-v-3 { animation-delay:1.25s; }
+.field-v-4 { animation-delay:1.45s; }
+.field-v-5 { animation-delay:1.65s; }
+
+/* card-1 hovers subtly (entry at 0.5s, float starts at 1.3s) */
+.card-1 {
+  opacity:0;
+  animation:
+    cardEntry 0.8s cubic-bezier(.22,1,.36,1) 0.5s forwards,
+    floatA    7s  ease-in-out                1.3s infinite;
+}
+.card-2 {
+  opacity:0;
+  animation:
+    cardEntry 0.8s cubic-bezier(.22,1,.36,1) 0.7s forwards,
+    floatB    9s  ease-in-out                1.5s infinite;
+}
+.card-3 {
+  opacity:0;
+  animation:
+    cardEntry 0.8s cubic-bezier(.22,1,.36,1) 0.9s forwards,
+    floatC    6s  ease-in-out                1.7s infinite;
+}
+
+/* ─── Scroll-reveal (IntersectionObserver adds .in-view) ────────────────── */
+
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition:
+    opacity  0.75s cubic-bezier(.22,1,.36,1),
+    transform 0.75s cubic-bezier(.22,1,.36,1);
+}
+.reveal.in-view { opacity:1; transform:translateY(0); }
+
+/* Stagger helpers — add delay only after the element is in-view */
+.reveal-d1.in-view { transition-delay: 80ms;  }
+.reveal-d2.in-view { transition-delay: 160ms; }
+.reveal-d3.in-view { transition-delay: 240ms; }
+.reveal-d4.in-view { transition-delay: 320ms; }
+
+/* Scale variant for feature visuals */
+.reveal-scale {
+  opacity: 0;
+  transform: scale(0.96) translateY(20px);
+  transition:
+    opacity  0.8s cubic-bezier(.22,1,.36,1),
+    transform 0.8s cubic-bezier(.22,1,.36,1);
+}
+.reveal-scale.in-view { opacity:1; transform:scale(1) translateY(0); }
+
+/* ─── Respect prefers-reduced-motion ───────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .hero-badge,.hero-h1,.hero-sub,.hero-cta,
+  .card-1,.card-2,.card-3,
+  .field-v { opacity:1; animation:none; }
+  .reveal,.reveal-scale { opacity:1; transform:none; transition:none; }
+}
+
+/* ─── Misc utilities ───────────────────────────────────────────────────── */
 @layer utilities {
-  /* CSS text-wrap balance — better headline wrapping */
   .text-balance { text-wrap: balance; }
-
-  /* Subtle gradient used on homepage hero */
-  .bg-hero-gradient {
-    background: linear-gradient(
-      160deg,
-      #f8fafc 0%,
-      #f0f4ff 40%,
-      #f8fafc 100%
-    );
-  }
-
-  /* Grid dot pattern for homepage */
   .bg-grid-dots {
-    background-image: radial-gradient(circle, #d1d5db 1px, transparent 1px);
-    background-size: 24px 24px;
+    background-image: radial-gradient(circle, #e2e8f0 1px, transparent 1px);
+    background-size: 28px 28px;
   }
 }
