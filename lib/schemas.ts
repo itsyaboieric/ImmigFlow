@@ -153,7 +153,9 @@ export const UpdateCaseSchema = z
 /** document type field shared between upload form and extract route */
 export const DocumentTypeSchema = z.enum(DOCUMENT_TYPES)
 
-/** Parse a Zod error into a single human-readable string for API responses. */
+/** Parse a Zod error into a single human-readable string for API responses.
+ *  Zod v4 renamed .errors → .issues; this handles both for safety. */
 export function zodErrorMessage(error: z.ZodError): string {
-  return error.errors.map((e) => e.message).join('. ')
+  const issues = (error.issues ?? (error as unknown as { errors: z.ZodIssue[] }).errors) ?? []
+  return issues.map((e: z.ZodIssue) => e.message).join('. ')
 }

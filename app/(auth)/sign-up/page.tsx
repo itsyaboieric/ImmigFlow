@@ -19,8 +19,9 @@ export default function SignUpPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    if (form.password !== form.confirm) { setError('Passwords do not match.'); return }
-    if (form.password.length < 8)       { setError('Password must be at least 8 characters.'); return }
+    if (form.password !== form.confirm)              { setError('Passwords do not match.'); return }
+    if (form.password.length < 8)                    { setError('Password must be at least 8 characters.'); return }
+    if (!/[^a-zA-Z]/.test(form.password))            { setError('Password must contain at least one number or special character (e.g. TestPass1).'); return }
 
     setLoading(true)
     const res = await fetch('/api/auth/register', {
