@@ -113,7 +113,7 @@ function DocumentFlowVisual() {
   return (
     <div className="space-y-3">
       {docs.map((doc, i) => (
-        <ScrollReveal key={doc.name} className={`reveal reveal-d${i + 1}`}>
+        <ScrollReveal key={doc.name} delay={(i + 1) * 80}>
           <div className="bg-white rounded-xl border border-gray-200 shadow-card p-4 flex items-start gap-4">
             {/* File icon */}
             <div className="w-9 h-10 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -160,7 +160,7 @@ function ValidationVisual() {
       </div>
       <div className="px-5 py-4 space-y-2.5">
         {checks.map((c, i) => (
-          <ScrollReveal key={c.label} className={`reveal reveal-d${i + 1}`}>
+          <ScrollReveal key={c.label} delay={(i + 1) * 80}>
             <div className={`flex items-start gap-3 px-3.5 py-2.5 rounded-xl ${
               c.warn ? 'bg-amber-50 border border-amber-100' : 'bg-emerald-50/60 border border-emerald-100'
             }`}>
@@ -323,22 +323,22 @@ export default function LandingPage() {
       {/* ── Stat callout ─────────────────────────────────────────────────── */}
       <section className="py-32 bg-white border-y border-gray-100 text-center overflow-hidden">
         <div className="max-w-4xl mx-auto px-6">
-          <ScrollReveal className="reveal">
+          <ScrollReveal className="">
             <p className="text-sm font-semibold uppercase tracking-widest text-gray-400 mb-10">The time savings</p>
           </ScrollReveal>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-12">
-            <ScrollReveal className="reveal reveal-d1">
+            <ScrollReveal delay={80}>
               <div className="text-center">
-                <div className="text-7xl md:text-8xl font-bold text-gray-200 line-through decoration-red-400 decoration-[6px] leading-none mb-2 tracking-tight">
+                <div className="text-7xl md:text-8xl font-bold text-gray-400 line-through decoration-red-400 decoration-[6px] leading-none mb-2 tracking-tight">
                   6–8
                 </div>
                 <p className="text-gray-400 text-sm font-medium">hours per file (today)</p>
               </div>
             </ScrollReveal>
-            <ScrollReveal className="reveal reveal-d2">
-              <div className="text-5xl text-gray-200 font-light">→</div>
+            <ScrollReveal delay={160}>
+              <div className="text-5xl text-gray-300 font-light">→</div>
             </ScrollReveal>
-            <ScrollReveal className="reveal reveal-d3">
+            <ScrollReveal delay={240}>
               <div className="text-center">
                 <div className="text-7xl md:text-8xl font-bold text-brand-600 leading-none mb-2 tracking-tight">
                   90
@@ -347,7 +347,7 @@ export default function LandingPage() {
               </div>
             </ScrollReveal>
           </div>
-          <ScrollReveal className="reveal mt-10 reveal-d4">
+          <ScrollReveal className="mt-10" delay={320}>
             <p className="text-gray-400 text-base max-w-lg mx-auto">
               The same work Jordan spent 6–8 hours on — opening the passport, typing the number into a PDF,
               opening the diploma, typing the institution name into another field. Done before lunch.
@@ -364,7 +364,7 @@ export default function LandingPage() {
           <div className="max-w-6xl mx-auto px-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
               <div className="lg:sticky lg:top-28">
-                <ScrollReveal className="reveal">
+                <ScrollReveal className="">
                   <span className="text-xs font-bold tracking-widest uppercase text-brand-600 mb-4 block">Document extraction</span>
                   <h2 className="text-4xl md:text-5xl font-bold text-gray-900 tracking-tight leading-tight mb-5 text-balance">
                     AI reads every document you upload.
@@ -393,7 +393,7 @@ export default function LandingPage() {
                 <ValidationVisual />
               </div>
               <div className="order-1 lg:order-2 lg:sticky lg:top-28">
-                <ScrollReveal className="reveal">
+                <ScrollReveal className="">
                   <span className="text-xs font-bold tracking-widest uppercase text-brand-600 mb-4 block">Validation</span>
                   <h2 className="text-4xl md:text-5xl font-bold text-gray-900 tracking-tight leading-tight mb-5 text-balance">
                     Every field is cross-checked automatically.
@@ -414,7 +414,7 @@ export default function LandingPage() {
         {/* Feature 3: Sign off */}
         <section className="py-28 bg-gray-50 border-b border-gray-100">
           <div className="max-w-4xl mx-auto px-6 text-center mb-14">
-            <ScrollReveal className="reveal">
+            <ScrollReveal className="">
               <span className="text-xs font-bold tracking-widest uppercase text-brand-600 mb-4 block">RCIC sign-off</span>
               <h2 className="text-4xl md:text-5xl font-bold text-gray-900 tracking-tight leading-tight mb-5 text-balance">
                 You review. You sign. You submit.
@@ -425,7 +425,7 @@ export default function LandingPage() {
               </p>
             </ScrollReveal>
           </div>
-          <ScrollReveal className="reveal-scale max-w-2xl mx-auto px-6">
+          <ScrollReveal className="max-w-2xl mx-auto px-6">
             <SignoffVisual />
           </ScrollReveal>
         </section>
@@ -434,7 +434,7 @@ export default function LandingPage() {
       {/* ── Trust / compliance ────────────────────────────────────────────── */}
       <section className="py-24 bg-white border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-6">
-          <ScrollReveal className="reveal text-center mb-12">
+          <ScrollReveal className="text-center mb-12">
             <span className="text-xs font-bold tracking-widest uppercase text-brand-600 mb-3 block">Designed for licensed professionals</span>
             <h2 className="text-3xl font-bold text-gray-900 tracking-tight">
               Built around RCIC compliance requirements
@@ -447,7 +447,7 @@ export default function LandingPage() {
               { icon: '🛡️', label: 'Data stored in Canada', desc: 'All client data stays within Canadian borders. PIPEDA-compliant from day one.' },
               { icon: '⚠️', label: '90% confidence rule',   desc: 'Fields below 90% extraction confidence are flagged red and require manual verification.' },
             ].map(({ icon, label, desc }, i) => (
-              <ScrollReveal key={label} className={`reveal reveal-d${i + 1}`}>
+              <ScrollReveal key={label} delay={(i + 1) * 80}>
                 <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 h-full">
                   <div className="text-2xl mb-4">{icon}</div>
                   <h3 className="font-semibold text-gray-900 mb-2 text-[14px]">{label}</h3>
@@ -462,7 +462,7 @@ export default function LandingPage() {
       {/* ── Pricing ────────────────────────────────────────────────────────── */}
       <section id="pricing" className="py-24 bg-gray-50 border-b border-gray-100">
         <div className="max-w-5xl mx-auto px-6">
-          <ScrollReveal className="reveal text-center mb-14">
+          <ScrollReveal className="text-center mb-14">
             <span className="text-xs font-bold tracking-widest uppercase text-brand-600 mb-3 block">Pricing</span>
             <h2 className="text-3xl font-bold text-gray-900 tracking-tight mb-3">Simple, transparent pricing</h2>
             <p className="text-gray-500">
@@ -476,7 +476,7 @@ export default function LandingPage() {
               { name: 'Practice', price: '$349', desc: 'For a small firm ready to scale throughput.', highlight: true, features: ['3 RCICs', 'Unlimited files', 'Team collaboration', 'White-label portal', 'Priority support'] },
               { name: 'Firm',    price: '$699', desc: 'For multi-consultant practices and regional firms.', features: ['10 RCICs', 'Multi-location', 'Custom branding', 'API access', 'Dedicated onboarding'] },
             ].map(({ name, price, desc, highlight, features }, i) => (
-              <ScrollReveal key={name} className={`reveal reveal-d${i + 1}`}>
+              <ScrollReveal key={name} delay={(i + 1) * 80}>
                 <div className={`rounded-2xl border p-7 flex flex-col h-full relative ${
                   highlight ? 'bg-gray-900 border-gray-800 shadow-card-lg' : 'bg-white border-gray-200 shadow-card'
                 }`}>
@@ -509,7 +509,7 @@ export default function LandingPage() {
               </ScrollReveal>
             ))}
           </div>
-          <ScrollReveal className="reveal mt-8 text-center">
+          <ScrollReveal className="mt-8 text-center">
             <p className="text-sm text-gray-400">No annual commitment in year one. Cancel any time.</p>
           </ScrollReveal>
         </div>
@@ -518,7 +518,7 @@ export default function LandingPage() {
       {/* ── Final CTA ────────────────────────────────────────────────────── */}
       <section className="py-24 bg-white">
         <div className="max-w-3xl mx-auto px-6 text-center">
-          <ScrollReveal className="reveal">
+          <ScrollReveal className="">
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 tracking-tight mb-4 text-balance">
               Ready to double your throughput?
             </h2>
