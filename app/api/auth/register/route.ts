@@ -36,7 +36,8 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: zodErrorMessage(parsed.error) }, { status: 400 })
   }
-  const { name, email, firmName, password } = parsed.data
+  const { name, firmName, password } = parsed.data
+  const email = parsed.data.email.toLowerCase() // normalise so sign-in lookup always matches
 
   // ── 3. Check for existing account ─────────────────────────────────────────
   // Always hash the password before the DB lookup so timing is constant

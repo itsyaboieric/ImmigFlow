@@ -154,8 +154,9 @@ export const UpdateCaseSchema = z
 export const DocumentTypeSchema = z.enum(DOCUMENT_TYPES)
 
 /** Parse a Zod error into a single human-readable string for API responses.
- *  Zod v4 renamed .errors → .issues; this handles both for safety. */
+ *  Zod v4 renamed .errors → .issues; cast to any to handle both versions. */
 export function zodErrorMessage(error: z.ZodError): string {
-  const issues = (error.issues ?? (error as unknown as { errors: z.ZodIssue[] }).errors) ?? []
-  return issues.map((e: z.ZodIssue) => e.message).join('. ')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const issues: Array<{ message: string }> = (error as any).issues ?? (error as any).errors ?? []
+  return issues.map(e => e.message).join('. ')
 }
