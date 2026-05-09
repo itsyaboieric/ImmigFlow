@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { removeCaseUploadDirectory } from '@/lib/storage'
 
 export async function GET(
   _req: NextRequest,
@@ -65,5 +66,6 @@ export async function DELETE(
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   await prisma.case.delete({ where: { id: params.id } })
+  removeCaseUploadDirectory(params.id)
   return NextResponse.json({ success: true })
 }

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { parseModelJsonObject } from './parse-json-block'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
@@ -151,13 +152,13 @@ export async function extractDocumentData(
 
   const rawText = response.content[0].type === 'text' ? response.content[0].text : ''
 
-  try {
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) throw new Error('No JSON found in response')
-    const data = JSON.parse(jsonMatch[0]) as Record<string, unknown>
-    const confidence = typeof data.confidence === 'number' ? data.confidence : 0.85
-    return { data, confidence }
-  } catch {
-    return { data: { raw_text: rawText, parse_error: true }, confidence: 0.0 }
+  const parsed = parseModelJsonObject(rawText)
+  if (parsed) {
+    const confidence = typeof parsed.confidence === 'number' ? parsed.confidence : 0.85
+    return { data: parsed, confidence }
+  }
+  return {
+    data: { raw_text: rawText.trim().slice(0, 8000), parse_error: true },
+    confidence: 0.0,
   }
 }

@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { writeFileSync, mkdirSync } from 'fs'
-import { join } from 'path'
+import { MAX_UPLOAD_BYTES, saveUploadedFile } from '@/lib/storage'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,15 +34,23 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Save file to uploads directory
   const bytes = await file.arrayBuffer()
   const buffer = Buffer.from(bytes)
-  const ext = file.name.split('.').pop() ?? 'bin'
-  const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-  const uploadDir = join(process.cwd(), 'uploads', caseId)
+  if (buffer.length > MAX_UPLOAD_BYTES) {
+    return NextResponse.json(
+      { error: `File must be ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB or smaller.` },
+      { status: 413 }
+    )
+  }
 
-  mkdirSync(uploadDir, { recursive: true })
-  writeFileSync(join(uploadDir, fileName), buffer)
+  const ext = file.name.split('.').pop() ?? 'bin'
+  let fileName: string
+  try {
+    fileName = saveUploadedFile(caseId, buffer, ext)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Failed to save file.'
+    return NextResponse.json({ error: msg }, { status: 400 })
+  }
 
   const doc = await prisma.document.create({
     data: {

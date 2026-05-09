@@ -1,9 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import bcrypt from 'bcryptjs'
+import { registerLimiter } from '@/lib/rate-limit'
+
+function clientKey(req: NextRequest): string {
+  const xf = req.headers.get('x-forwarded-for')
+  if (xf) return xf.split(',')[0]?.trim() || 'unknown'
+  return req.headers.get('x-real-ip')?.trim() || 'unknown'
+}
 
 export async function POST(req: NextRequest) {
   try {
+    const limit = registerLimiter.check(clientKey(req))
+    if (!limit.ok) {
+      const retrySec = Math.max(1, Math.ceil(limit.retryAfterMs / 1000))
+      return NextResponse.json(
+        { error: 'Too many registration attempts. Please try again in a minute.' },
+        { status: 429, headers: { 'Retry-After': String(retrySec) } }
+      )
+    }
+
     const { name, email, firmName, password } = await req.json()
 
     if (!email || !password || !name) {

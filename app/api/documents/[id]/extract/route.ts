@@ -3,8 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { extractDocumentData } from '@/lib/claude'
-import { readFileSync } from 'fs'
-import { join } from 'path'
+import { readUploadedFile } from '@/lib/storage'
 
 export const maxDuration = 60
 
@@ -30,8 +29,7 @@ export async function POST(
   })
 
   try {
-    const filePath = join(process.cwd(), 'uploads', doc.caseId, doc.fileName)
-    const buffer = readFileSync(filePath)
+    const buffer = readUploadedFile(doc.caseId, doc.fileName)
     const result = await extractDocumentData(buffer, doc.mimeType, doc.documentType)
 
     await prisma.document.update({

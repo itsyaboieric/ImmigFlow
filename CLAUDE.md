@@ -11,21 +11,27 @@ npm run build        # Production build
 npm start            # Run production build
 
 # Database
-npm run db:generate  # Regenerate Prisma client after schema changes
-npm run db:push      # Sync schema to dev.db without migrations (dev only)
+npm run db:generate      # Regenerate Prisma client after schema changes
+npm run db:push          # Sync schema to dev.db without migrations (solo dev convenience)
+npm run db:migrate       # Create / apply migrations in dev (`prisma migrate dev`)
+npm run db:migrate:deploy # Apply pending migrations (`prisma migrate deploy`, CI/prod)
+
+# Quality
+npm run lint   # ESLint (`next lint`)
+npm run test   # Vitest unit tests (`tests/*.test.ts`)
 ```
 
+If `dev.db` already exists from historic `db:push` use only, baseline migrations once: `npx prisma migrate resolve --applied 20260509120000_baseline`
+
+After any change to `prisma/schema.prisma`, run `db:generate`, then prefer `db:migrate` over `db:push`.
+
 > Node.js is not system-installed. During this session it was bootstrapped from `/tmp/node-v20.18.1-darwin-x64/bin/`. Prefix commands with `export PATH="/tmp/node-v20.18.1-darwin-x64/bin:$PATH"` if `node`/`npm`/`npx` are not found. Running `setup.sh` installs Node.js permanently via Homebrew.
-
-There are no tests and no lint script configured.
-
-After any change to `prisma/schema.prisma`, run `db:generate` then `db:push`.
 
 ## Architecture
 
 ### Request flow
 
-Every authenticated page fetches data client-side via `fetch('/api/...')`. There is no server-side data fetching in page components — the `(dashboard)/layout.tsx` only checks the session server-side to gate the route group; actual data loading happens in Client Components with `useEffect`.
+`(dashboard)/layout.tsx` checks the session server-side. Most dashboard pages fetch via `fetch('/api/...')` in Client Components. The **case detail** route (`cases/[id]`) additionally loads initial case HTML on the server through `lib/server/load-case-detail.ts`; the interactive shell is still `components/cases/CaseDetailClient.tsx`.
 
 ### Auth
 
@@ -37,7 +43,7 @@ Single SQLite file (`dev.db`) managed by Prisma. Three models: `User → Case �
 
 ### AI extraction pipeline (`lib/claude.ts`)
 
-`extractDocumentData(buffer, mimeType, documentType)` sends a file to `claude-sonnet-4-6` as either a `document` block (PDF) or `image` block (JPEG/PNG/WebP) alongside a strict JSON schema prompt. The response is regex-matched for a JSON object and parsed. If parsing fails, `confidence: 0.0` is returned with `parse_error: true` in the data. Each document type has its own prompt in `EXTRACTION_PROMPTS` — edit these to change what fields are extracted.
+`extractDocumentData(buffer, mimeType, documentType)` sends a file to `claude-sonnet-4-6` as either a `document` block (PDF) or `image` block (JPEG/PNG/WebP) alongside a strict JSON schema prompt. The textual response is parsed with `lib/parse-json-block.ts` (fences-aware, tries successive balanced `{...}` candidates). If parsing fails, `confidence: 0.0` is returned with `parse_error: true` in the data. Each document type has its own prompt in `EXTRACTION_PROMPTS` — edit these to change what fields are extracted.
 
 ### Validation and form mapping (`lib/validation.ts`)
 
@@ -56,8 +62,12 @@ Both functions are called server-side in `app/api/cases/[id]/validate/route.ts` 
 
 ### File storage
 
-Uploaded files are written to `uploads/<caseId>/<timestamp>_<random>.<ext>` on the local filesystem (not in `public/`). The extract route reads them back with `readFileSync`. There is no file-serving API route — files are never streamed to the browser. For production, replace with cloud object storage and update both `app/api/upload/route.ts` and `app/api/documents/[id]/extract/route.ts`.
+`lib/storage.ts` owns read/write/delete paths under `uploads/<caseId>/` (still local disk for MVP). Hard cap `MAX_UPLOAD_BYTES` (4 MB) is enforced server-side at upload time. Case deletion removes orphaned files (`removeCaseUploadDirectory`). Swap `storage` internals for cloud object storage in production.
 
-### Case detail page (`app/(dashboard)/cases/[id]/page.tsx`)
+There is no file-serving API route — files are never streamed to the browser.
 
-The largest file (~810 lines). Fully client-side. Manages all tab state, upload state, per-document extraction loading state (`Record<string, boolean>`), and validation/form-mapping results locally. The sign-off flow requires `confirmed` checkbox, calls `POST /api/cases/[id]/signoff`, then offers a client-side JSON download built from current state — no server-side export route exists.
+### Case detail UI
+
+`app/(dashboard)/cases/[id]/page.tsx` (server shell) wraps `components/cases/CaseDetailClient.tsx`. Tab bodies live under `components/cases/*Tab.tsx`; client refresh still uses `/api/cases/[id]` after uploads and extraction.
+
+The sign-off flow requires `confirmed` checkbox, calls `POST /api/cases/[id]/signoff`, then offers a client-side JSON download built from current state — no server-side export route exists.
