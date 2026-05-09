@@ -12,6 +12,10 @@ const nextConfig = {
   },
 
   async headers() {
+    // Avoid strict CSP / HSTS interfering with Next.js dev HMR and local HTTP debugging.
+    if (process.env.NODE_ENV !== 'production') {
+      return []
+    }
     return [
       {
         source: '/:path*',

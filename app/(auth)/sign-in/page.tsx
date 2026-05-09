@@ -2,11 +2,9 @@
 
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export default function SignInPage() {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -16,12 +14,22 @@ export default function SignInPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const result = await signIn('credentials', { email, password, redirect: false })
-    setLoading(false)
-    if (result?.error) {
-      setError('Invalid email or password.')
-    } else {
-      router.push('/dashboard')
+    try {
+      const emailNorm = email.toLowerCase().trim()
+      const result = await signIn('credentials', {
+        email: emailNorm,
+        password,
+        redirect: false,
+      })
+      if (!result?.ok || result.error) {
+        setError('Invalid email or password. If you just registered, use the same password and check spelling.')
+        return
+      }
+      window.location.href = '/dashboard'
+    } catch {
+      setError('Could not reach the server. Check your connection or restart the dev server.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -74,7 +82,10 @@ export default function SignInPage() {
               </div>
 
               {error && (
-                <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3.5 py-2.5 flex items-center gap-2">
+                <div
+                  role="alert"
+                  className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3.5 py-2.5 flex items-start gap-2"
+                >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0">
                     <circle cx="7" cy="7" r="6.5" stroke="#ef4444"/>
                     <path d="M7 4v3.5M7 9.5v.5" stroke="#ef4444" strokeWidth="1.2" strokeLinecap="round"/>

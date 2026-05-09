@@ -2,11 +2,9 @@
 
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export default function SignUpPage() {
-  const router = useRouter()
   const [form, setForm] = useState({ name: '', email: '', firmName: '', password: '', confirm: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -24,15 +22,64 @@ export default function SignUpPage() {
     if (!/[^a-zA-Z]/.test(form.password))            { setError('Password must contain at least one number or special character (e.g. TestPass1).'); return }
 
     setLoading(true)
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: form.name, email: form.email, firmName: form.firmName, password: form.password }),
-    })
-    const data = await res.json()
-    if (!res.ok) { setError(data.error ?? 'Registration failed.'); setLoading(false); return }
-    await signIn('credentials', { email: form.email, password: form.password, redirect: false })
-    router.push('/dashboard')
+    try {
+      let res: Response
+      try {
+        res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: form.name, email: form.email, firmName: form.firmName, password: form.password }),
+        })
+      } catch {
+        setError('Network error. Check your connection and try again.')
+        return
+      }
+
+      const raw = await res.text()
+      let data: { error?: string } = {}
+      if (raw.trim()) {
+        try {
+          data = JSON.parse(raw) as { error?: string }
+        } catch {
+          setError(
+            `The server returned an unexpected response (HTTP ${res.status}). Check the terminal for errors or restart the dev server.`
+          )
+          return
+        }
+      }
+
+      if (!res.ok) {
+        let msg = data.error ?? `Registration failed (${res.status}).`
+        if (msg === 'Registration failed. Check your details.') {
+          msg =
+            'Could not register. That email may already be in use — try signing in — or fix any invalid fields below.'
+        }
+        setError(msg)
+        return
+      }
+
+      const emailNorm = form.email.toLowerCase().trim()
+      try {
+        const signInResult = await signIn('credentials', {
+          email: emailNorm,
+          password: form.password,
+          redirect: false,
+        })
+        if (!signInResult?.ok || signInResult.error) {
+          setError(
+            'Your account was created, but automatic sign-in failed. Open Sign in and log in with the same email and password.'
+          )
+          return
+        }
+        window.location.href = '/dashboard'
+      } catch {
+        setError('Your account may have been created. Try signing in manually from the Sign in page.')
+      }
+    } catch {
+      setError('Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const inputClass = "w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all placeholder:text-gray-400"
@@ -78,6 +125,9 @@ export default function SignUpPage() {
               <div>
                 <label className={labelClass}>Password</label>
                 <input type="password" required value={form.password} onChange={set('password')} className={inputClass} placeholder="At least 8 characters" />
+                <p className="text-xs text-gray-500 mt-1.5">
+                  Use at least 8 characters and include a number or symbol (e.g. <span className="font-mono text-gray-600">SecurePass1</span>).
+                </p>
               </div>
               <div>
                 <label className={labelClass}>Confirm Password</label>
@@ -85,7 +135,10 @@ export default function SignUpPage() {
               </div>
 
               {error && (
-                <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3.5 py-2.5 flex items-center gap-2">
+                <div
+                  role="alert"
+                  className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3.5 py-2.5 flex items-start gap-2"
+                >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0">
                     <circle cx="7" cy="7" r="6.5" stroke="#ef4444"/>
                     <path d="M7 4v3.5M7 9.5v.5" stroke="#ef4444" strokeWidth="1.2" strokeLinecap="round"/>

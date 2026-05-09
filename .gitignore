@@ -6,3 +6,4 @@ uploads/
 .env.local
 .env*.local
 .claude/
+tsconfig.tsbuildinfo
