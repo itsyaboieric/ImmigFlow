@@ -1,7 +1,20 @@
+/**
+ * Claude API wrapper for document extraction.
+ *
+ * Security notes:
+ *   - ANTHROPIC_API_KEY is read from env at call time (never bundled client-side).
+ *   - documentType is validated against a strict allowlist before use (OWASP A03).
+ *   - Only server-side code should import this module.
+ */
+
 import Anthropic from '@anthropic-ai/sdk'
 import { parseModelJsonObject } from './parse-json-block'
+import { env } from './env'
+import { DOCUMENT_TYPES } from './schemas'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+// The Anthropic client is instantiated lazily so startup env validation runs first.
+// API key is sourced from lib/env.ts which rejects placeholder values.
+const anthropic = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
 
 const EXTRACTION_PROMPTS: Record<string, string> = {
   PASSPORT: `Extract all fields from this passport. Return ONLY a valid JSON object with these exact keys:
@@ -114,8 +127,14 @@ export async function extractDocumentData(
   mimeType: string,
   documentType: string
 ): Promise<ExtractionResult> {
+  // Allowlist documentType — reject any value not in the known set (OWASP A03).
+  // Falls back to OTHER for types not individually tuned, but never uses arbitrary input as a prompt key.
+  const safeType = (DOCUMENT_TYPES as readonly string[]).includes(documentType)
+    ? documentType
+    : 'OTHER'
+
   const base64Data = fileBuffer.toString('base64')
-  const prompt = EXTRACTION_PROMPTS[documentType] ?? EXTRACTION_PROMPTS.OTHER
+  const prompt = EXTRACTION_PROMPTS[safeType] ?? EXTRACTION_PROMPTS.OTHER
 
   const isPdf = mimeType === 'application/pdf'
   const isImage = mimeType.startsWith('image/')
